@@ -1,37 +1,43 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Auth } from "aws-amplify";
+import { fetchUserAttributes, fetchMFAPreference } from "aws-amplify/auth";
 import { filesize } from "filesize";
 import "./MyProfile.css";
 
 function MyProfile(props) {
-  const {genInfor} = props
-  const [myProfile, setMyProfile] = React.useState({});
+  const { genInfor } = props;
+  const [myProfile, setMyProfile] = useState({});
   const navigate = useNavigate();
+
   const redirectPage = () => {
-    navigate("/profile/update", {state: myProfile});
+    navigate("/profile/update", { state: myProfile });
   };
 
   useEffect(() => {
-    Auth.currentAuthenticatedUser().then((session) => {
-      console.log(session);
-      setMyProfile({
-        id: session.attributes["sub"],
-        name: session.username,
-        email: session.attributes["email"],
-        status: session.attributes["email_verified"] ? "Confirmed" : "Unconfirmed",
-        pool_id: session.pool["userPoolId"],
-        mfa: session.preferredMFA === "NOMFA" ? "－" : session.preferredMFA,
-      })
-    })
-    .catch((error) => {
-      console.log("error: ", error)
-    })
-  }, [])
+    async function loadProfile() {
+      try {
+        const attributes = await fetchUserAttributes();
+        let mfa = "－";
+        try {
+          const mfaPreference = await fetchMFAPreference();
+          mfa = mfaPreference.preferred || (mfaPreference.enabled || []).join(", ") || "－";
+        } catch (error) {
+          console.log("Cannot get MFA preference: ", error);
+        }
+        setMyProfile({
+          id: attributes.sub,
+          name: attributes.preferred_username || attributes.email,
+          email: attributes.email,
+          status: attributes.email_verified === "true" ? "Confirmed" : "Unconfirmed",
+          mfa,
+        });
+      } catch (error) {
+        console.log("error: ", error);
+      }
+    }
+    loadProfile();
+  }, []);
 
-  const handleChangeProfile = (e) => {
-    redirectPage();
-  }
   return (
     <div className="upload-body">
       <div className="title content-header">My Profile</div>
@@ -39,7 +45,7 @@ function MyProfile(props) {
         <button
           type="button"
           className="btn btn-gray text-normal"
-          onClick={handleChangeProfile}
+          onClick={redirectPage}
         >
           Update profile
         </button>
@@ -50,25 +56,19 @@ function MyProfile(props) {
                 User name
               </label>
               <br />
-              <span className="text-normal text-line">
-                {myProfile.name}
-              </span>
+              <span className="text-normal text-line">{myProfile.name}</span>
             </div>
             <div className="infor-item">
               <label className="text-normal text-line text-black">
                 User ID
               </label>
               <br />
-              <span className="text-normal text-line">
-                {myProfile.id}
-              </span>
+              <span className="text-normal text-line">{myProfile.id}</span>
             </div>
             <div className="infor-item">
               <label className="text-normal text-line text-black">Email</label>
               <br />
-              <span className="text-normal text-line">
-                {myProfile.email}
-              </span>
+              <span className="text-normal text-line">{myProfile.email}</span>
             </div>
             <div className="infor-item">
               <label className="text-normal text-line text-black">
@@ -76,7 +76,7 @@ function MyProfile(props) {
               </label>
               <br />
               <span className="text-normal text-line">
-              {filesize(genInfor.size, { base: 1, standard: "jedec" })}
+                {filesize(genInfor.size, { standard: "jedec" })}
               </span>
             </div>
             <div className="infor-item">
@@ -84,7 +84,9 @@ function MyProfile(props) {
                 Amount of Files
               </label>
               <br />
-              <span className="text-normal text-line">{genInfor.amount > 0 ? genInfor.amount + " files" : 0 + " file"}</span>
+              <span className="text-normal text-line">
+                {genInfor.amount > 1 ? genInfor.amount + " files" : genInfor.amount + " file"}
+              </span>
             </div>
           </div>
           <div className="col-50" style={{ paddingLeft: "2%" }}>
@@ -93,7 +95,7 @@ function MyProfile(props) {
                 MFA methods
               </label>
               <br />
-              <span className="text-normal text-line">{myProfile.mfaMethod}－</span>
+              <span className="text-normal text-line">{myProfile.mfa}</span>
             </div>
             <div className="infor-item">
               <label className="text-normal text-line text-black">

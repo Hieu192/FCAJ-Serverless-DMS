@@ -1,106 +1,116 @@
-import React, { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { useLocation } from "react-router-dom";
-import { Auth } from "aws-amplify";
+import React, { useState, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import {
+  updatePassword,
+  updateUserAttributes,
+  confirmUserAttribute,
+} from "aws-amplify/auth";
 import "./MyProfile.css";
-import {checkValidPwd} from "../../constant";
+import { checkValidPwd } from "../../constant";
+
+// Result codes of each update step
+const SKIPPED = 3; // nothing to update
+const INVALID = 2; // input is not valid, a warning is shown
+const FAILED = 0;
+const SUCCESS = 1;
 
 function UpdateProfile(props) {
+  const { refreshUser } = props;
   const location = useLocation();
-  const myProfile = location.state;
-  const [newEmail, setNewEmail] = useState(myProfile.email);
+  const myProfile = location.state || {};
+  const [newEmail, setNewEmail] = useState(myProfile.email || "");
   const [newPwd, setNewPwd] = useState("");
   const [oldPwd, setOldPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
   const [warningStatus, setWarningStatus] = useState("");
   const warning = useRef(null);
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   const backPage = () => {
     navigate("/profile");
-  }
-
-  const updateProfile = async () => {
-    const user = await Auth.currentAuthenticatedUser();
-    const updatePwsResult = await updatePassword(user)
-    const updateEmailResult = await updateEmail(user)
-    if ( updatePwsResult === 2 || updateEmailResult === 2){
-      //alert("Please fill in all the information");
-    }
-    else if( updatePwsResult === 0 ) {
-      alert("Update password fail");
-    }
-    else if (updateEmailResult === 0) {
-      alert("Update email fail");
-    }
-    else {
-      alert("Update profile successful");
-      if (warningStatus) {
-        warning.current.classList.remove("active");
-        setWarningStatus("");
-      }
-
-    }
-    return;
   };
 
-  const updatePassword = async (user) => {
-    if (oldPwd && newPwd && confirmPwd) {
-      if ( newPwd === confirmPwd) {
-        const checkResult = checkValidPwd(newPwd);
-        if (checkResult.length === 0) {
-          try {
-            await Auth.changePassword(user, oldPwd, newPwd);
-            return 1;
-          } catch (error) {
-            console.log(error);
-            return 0;
-          }
-        } else {
-          if (!warningStatus) {
-            warning.current.classList.toggle("active");
-          }
-          setWarningStatus(checkResult);
-          return 2;
-        }
-      }
-      else {
-        if (!warningStatus) {
-          warning.current.classList.toggle("active");
-        }
-        setWarningStatus("New password and Confirm password aren't matching");
-        return 2;
-      }
+  const showWarning = (message) => {
+    if (warning.current && !warning.current.classList.contains("active")) {
+      warning.current.classList.add("active");
     }
-    else {
-      if (!warningStatus) {
-        warning.current.classList.toggle("active");
-      }
-      setWarningStatus("Please fill in all the information");
-      return 2
-    };
-  }
+    setWarningStatus(message);
+  };
 
-  const updateEmail = async (user) => {
-    if (!newEmail) {
-      if (!warningStatus) {
-        warning.current.classList.toggle("active");
-      }
-      setWarningStatus("Email cannot be empty");
-      return 2;
+  const clearWarning = () => {
+    if (warning.current) warning.current.classList.remove("active");
+    setWarningStatus("");
+  };
+
+  const updateProfile = async () => {
+    const updatePwdResult = await changePassword();
+    if (updatePwdResult === INVALID) return;
+    const updateEmailResult = await changeEmail();
+    if (updateEmailResult === INVALID) return;
+
+    if (updatePwdResult === FAILED) {
+      alert("Update password fail");
+    } else if (updateEmailResult === FAILED) {
+      alert("Update email fail");
+    } else if (updatePwdResult === SKIPPED && updateEmailResult === SKIPPED) {
+      showWarning("Please fill in the information you want to update");
+    } else {
+      clearWarning();
+      alert("Update profile successful");
+      await refreshUser();
     }
-    if (newEmail !== myProfile.email) {
-      try {
-        await Auth.updateUserAttributes(user, {
-          email: newEmail,
+  };
+
+  const changePassword = async () => {
+    if (!oldPwd && !newPwd && !confirmPwd) return SKIPPED;
+    if (!oldPwd || !newPwd || !confirmPwd) {
+      showWarning("Please fill in all the password fields");
+      return INVALID;
+    }
+    if (newPwd !== confirmPwd) {
+      showWarning("New password and Confirm password aren't matching");
+      return INVALID;
+    }
+    const checkResult = checkValidPwd(newPwd);
+    if (checkResult.length !== 0) {
+      showWarning(checkResult);
+      return INVALID;
+    }
+    try {
+      await updatePassword({ oldPassword: oldPwd, newPassword: newPwd });
+      return SUCCESS;
+    } catch (error) {
+      console.log(error);
+      return FAILED;
+    }
+  };
+
+  const changeEmail = async () => {
+    if (!newEmail) {
+      showWarning("Email cannot be empty");
+      return INVALID;
+    }
+    if (newEmail === myProfile.email) return SKIPPED;
+    try {
+      const output = await updateUserAttributes({
+        userAttributes: { email: newEmail },
+      });
+      // Cognito sends a verification code to the new email address.
+      if (output.email?.nextStep?.updateAttributeStep === "CONFIRM_ATTRIBUTE_WITH_CODE") {
+        const code = window.prompt(`Enter the verification code sent to ${newEmail}`);
+        if (!code) return FAILED;
+        await confirmUserAttribute({
+          userAttributeKey: "email",
+          confirmationCode: code.trim(),
         });
-        return 1;
-      } catch (error) {
-        console.log(error);
-        return 0;
       }
-    } else return 1;
-  }
+      return SUCCESS;
+    } catch (error) {
+      console.log(error);
+      return FAILED;
+    }
+  };
+
   return (
     <div className="upload-body">
       <div className="title content-header">Update Profile</div>
@@ -118,7 +128,7 @@ function UpdateProfile(props) {
             <br />
             <input
               className="text-normal text-line input-short"
-              onChange={(e) => setNewEmail(e.target.value)}
+              onChange={(e) => setNewEmail(e.target.value.trim())}
               defaultValue={myProfile.email}
             ></input>
           </div>
@@ -131,6 +141,7 @@ function UpdateProfile(props) {
               type="password"
               className="text-normal text-line input-short"
               placeholder="••••••••"
+              autoComplete="current-password"
               onChange={(e) => setOldPwd(e.target.value)}
             ></input>
           </div>
@@ -142,6 +153,7 @@ function UpdateProfile(props) {
             <input
               type="password"
               className="text-normal text-line input-short"
+              autoComplete="new-password"
               onChange={(e) => setNewPwd(e.target.value)}
             ></input>
           </div>
@@ -153,6 +165,7 @@ function UpdateProfile(props) {
             <input
               type="password"
               className="text-normal text-line input-short"
+              autoComplete="new-password"
               onChange={(e) => setConfirmPwd(e.target.value)}
             ></input>
           </div>

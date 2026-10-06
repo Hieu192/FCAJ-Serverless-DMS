@@ -1,45 +1,49 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { NavLink, Link } from "react-router-dom";
-import { Auth } from "aws-amplify";
+import { signIn, signOut } from "aws-amplify/auth";
 
 import "./Authen.css";
 
 function Login(props) {
-  const {setCheckAuthen, setCurrentUser } = props;
-  const [unm, setUnm] = useState("");
+  const { refreshUser } = props;
+  const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const navigate = useNavigate();
-  const redirectPage = () => {
-    navigate("/");
-  };
 
   const redirectSignUpPage = () => {
     navigate("/signup");
-  }
-  async function signIn(event) {
+  };
+
+  async function handleSignIn(event) {
     event.preventDefault();
     try {
-      await Auth.signIn(unm, pwd);
-      const user =  await Auth.currentUserCredentials()
-      console.log("User ", user);
-      setCheckAuthen(true);
+      let result;
+      try {
+        result = await signIn({ username: email, password: pwd });
+      } catch (error) {
+        // A previous session is still stored in the browser: sign out and retry.
+        if (error.name !== "UserAlreadyAuthenticatedException") throw error;
+        await signOut();
+        result = await signIn({ username: email, password: pwd });
+      }
 
-      const session = await Auth.currentSession();
-      console.log("Session: ", session);
-      const userInfor = {
-        username: session.idToken.payload["cognito:username"],
-        id: session.idToken.payload["sub"],
-        identityId: user.identityId
-      };
-      setCurrentUser(userInfor);
-      redirectPage();
+      if (result.nextStep.signInStep === "CONFIRM_SIGN_UP") {
+        alert("Your account is not verified. Open Sign up, enter the same email and click \"Verify this account\".");
+        return;
+      }
+      if (!result.isSignedIn) {
+        alert(`Sign in requires another step: ${result.nextStep.signInStep}`);
+        return;
+      }
+
+      await refreshUser();
+      navigate("/");
     } catch (error) {
       console.log("Sign in fail: ", error);
       alert("Sign in fail");
-      return;
     }
   }
+
   return (
     <div className="container pt-5" style={{ textAlign: "left" }}>
       <div className="d-flex justify-content-center">
@@ -47,17 +51,18 @@ function Login(props) {
           <span className="text-header">Login</span>
           <div className="mb-3 mt-3">
             <label className="text-normal" htmlFor="email">
-              Username
+              Email
             </label>
             <br />
             <input
               type="email"
               className="text-normal text-black"
               id="email"
-              placeholder="Enter username"
+              placeholder="Enter email"
               name="email"
-              onChange={(e) => setUnm(e.target.value)}
-              value={unm}
+              autoComplete="username"
+              onChange={(e) => setEmail(e.target.value.trim())}
+              value={email}
             />
           </div>
           <div className="mb-3">
@@ -71,6 +76,7 @@ function Login(props) {
               id="pwd"
               placeholder="Enter password"
               name="pswd"
+              autoComplete="current-password"
               onChange={(e) => setPwd(e.target.value)}
               value={pwd}
             />
@@ -90,7 +96,7 @@ function Login(props) {
               Sign up
             </button>
             &nbsp;&nbsp;
-            <button type="button" className="btn btn-blue text-normal" onClick={signIn}>
+            <button type="button" className="btn btn-blue text-normal" onClick={handleSignIn}>
               Sign in
             </button>
           </div>

@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { NavLink, Link } from "react-router-dom";
+import { signUp, confirmSignUp, resendSignUpCode } from "aws-amplify/auth";
+import { checkValidPwd } from "../../constant";
 
-import { Auth } from "aws-amplify";
-
-function Resgister() {
+function Register() {
   const [isRegister, setIsRegister] = useState(false);
+  const [canVerifyExisting, setCanVerifyExisting] = useState(false);
   const [warningStatus, setWarningStatus] = useState("");
   const [unm, setUnm] = useState("");
   const [email, setEmail] = useState("");
@@ -18,70 +18,67 @@ function Resgister() {
     navigate("/signin");
   };
 
-  const signUp = async (event) => {
-    event.preventDefault();
-    const checkInputResult = checkInputData();
-    if (!checkInputResult) return;
-
-    try {
-      const { user } = await Auth.signUp({
-        username: unm,
-        password: pwd,
-        attributes: {
-          email,
-        },
-      });
-      setIsRegister(true);
-    } catch (error) {
-      console.log(error);
-      if (error["code"] === "UsernameExistsException") {
-        if (warning.current.classList[1] !== "active") {
-          warning.current.classList.toggle("active");
-        }
-        setWarningStatus("Username already exists");
-      }
+  const showWarning = (message) => {
+    if (warning.current && !warning.current.classList.contains("active")) {
+      warning.current.classList.add("active");
     }
+    setWarningStatus(message);
   };
 
   const checkInputData = () => {
-    let warningCheck = "";
-    const umnLeg = unm.length;
-    const emailLeg = email.length;
-    const pwdLeg = pwd.length;
-    const uppercaseRegExp = /(?=.*?[A-Z])/;
-    const lowercaseRegExp = /(?=.*?[a-z])/;
-    const digitsRegExp = /(?=.*?[0-9])/;
-    const minLengthRegExp = /.{8,}/;
-    const uppercasePassword = uppercaseRegExp.test(pwd);
-    const lowercasePassword = lowercaseRegExp.test(pwd);
-    const digitsPassword = digitsRegExp.test(pwd);
-    const minLengthPassword = minLengthRegExp.test(pwd);
-
-    if (umnLeg === 0 || emailLeg === 0 || pwdLeg === 0) {
-      warningCheck = "Username, email and password can't blank";
+    if (unm.length === 0 || email.length === 0 || pwd.length === 0) {
+      showWarning("Display name, email and password can't be blank");
+      return false;
     }
-
-    if (!uppercasePassword) {
-      warningCheck = "At least one Uppercase";
-    } else if (!lowercasePassword) {
-      warningCheck = "At least one Lowercase";
-    } else if (!digitsPassword) {
-      warningCheck = "At least one digit";
-    } else if (!minLengthPassword) {
-      warningCheck = "At least minumum 8 characters";
-    }
-
-    if (warningCheck.length !== 0) {
-      if (warning.current.classList[1] !== "active") {
-        warning.current.classList.toggle("active");
-      }
-      setWarningStatus(warningCheck);
+    const pwdWarning = checkValidPwd(pwd);
+    if (pwdWarning.length !== 0) {
+      showWarning(pwdWarning);
       return false;
     }
     return true;
   };
 
-  async function confirmSignUp(e) {
+  const handleSignUp = async (event) => {
+    event.preventDefault();
+    if (!checkInputData()) return;
+
+    try {
+      // The user signs in with the email address.
+      // The display name is saved in the `preferred_username` attribute.
+      await signUp({
+        username: email,
+        password: pwd,
+        options: {
+          userAttributes: {
+            email,
+            preferred_username: unm,
+          },
+        },
+      });
+      setIsRegister(true);
+    } catch (error) {
+      console.log(error);
+      if (error.name === "UsernameExistsException") {
+        setCanVerifyExisting(true);
+        showWarning("Email already exists");
+      } else {
+        showWarning(error.message || "Sign up fail");
+      }
+    }
+  };
+
+  // Send a new code to an email that was registered but not verified yet.
+  const verifyExistingAccount = async () => {
+    try {
+      await resendSignUpCode({ username: email });
+      setIsRegister(true);
+    } catch (error) {
+      console.log(error);
+      showWarning(error.message || "Cannot send verification code");
+    }
+  };
+
+  async function handleConfirmSignUp(e) {
     e.preventDefault();
     if (!code || code.length < 6) {
       alert("Please enter code again");
@@ -89,7 +86,7 @@ function Resgister() {
     }
 
     try {
-      await Auth.confirmSignUp(unm, code);
+      await confirmSignUp({ username: email, confirmationCode: code.trim() });
     } catch (error) {
       console.log("error confirming sign up", error);
       alert("Verify fail!");
@@ -105,21 +102,21 @@ function Resgister() {
           <div className="col-md-7">
             <span className="text-header">Register</span>
             <div className="mb-3 mt-3">
-              <label className="text-normal" htmlFor="email">
-                Username
+              <label className="text-normal" htmlFor="unm">
+                Display name
               </label>
               <br />
               <input
                 className="text-normal text-black"
                 id="unm"
-                placeholder="Enter username"
-                name="email"
+                placeholder="Enter display name"
+                name="unm"
                 onChange={(e) => setUnm(e.target.value)}
                 value={unm}
               />
             </div>
             <div className="mb-3">
-              <label className="text-normal" htmlFor="pwd">
+              <label className="text-normal" htmlFor="email">
                 Email
               </label>
               <br />
@@ -128,8 +125,9 @@ function Resgister() {
                 className="text-normal text-black"
                 id="email"
                 placeholder="Enter email"
-                name="pswd"
-                onChange={(e) => setEmail(e.target.value)}
+                name="email"
+                autoComplete="username"
+                onChange={(e) => setEmail(e.target.value.trim())}
                 value={email}
               />
             </div>
@@ -144,6 +142,7 @@ function Resgister() {
                 id="pwd"
                 placeholder="Enter password"
                 name="pswd"
+                autoComplete="new-password"
                 onChange={(e) => setPwd(e.target.value)}
                 value={pwd}
               />
@@ -162,6 +161,18 @@ function Resgister() {
               <i className="fa-solid fa-triangle-exclamation text-red"></i>
               &nbsp;&nbsp;
               <label className="text-red">{warningStatus}</label>
+              {canVerifyExisting && (
+                <>
+                  &nbsp;&nbsp;
+                  <button
+                    type="button"
+                    className="btn btn-link text-normal p-0"
+                    onClick={verifyExistingAccount}
+                  >
+                    Verify this account
+                  </button>
+                </>
+              )}
             </div>
             <div className="login-footer">
               <button type="button" className="btn btn-cancel text-normal" onClick={redirectPage}>
@@ -171,7 +182,7 @@ function Resgister() {
               <button
                 type="button"
                 className="btn btn-blue text-normal"
-                onClick={signUp}
+                onClick={handleSignUp}
               >
                 Sign up
               </button>
@@ -181,15 +192,16 @@ function Resgister() {
         {isRegister && (
           <div className="col-md-7">
             <span className="text-header">Verify Account</span>
-            <div action="/action_page.php">
+            <div>
               <div className="mb-5 mt-5">
-                <label label className="text-normal" htmlFor="code">
+                <label className="text-normal" htmlFor="code">
                   Verify code
                 </label>
                 <input
                   className="text-normal text-black"
                   id="code"
-                  name="pswd"
+                  name="code"
+                  autoComplete="one-time-code"
                   onChange={(e) => setCode(e.target.value)}
                   value={code}
                 />
@@ -202,7 +214,7 @@ function Resgister() {
               <div className="login-footer">
                 <button
                   className="btn btn-blue text-normal"
-                  onClick={confirmSignUp}
+                  onClick={handleConfirmSignUp}
                 >
                   Submit
                 </button>
@@ -215,4 +227,4 @@ function Resgister() {
   );
 }
 
-export default Resgister;
+export default Register;

@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useRef } from "react";
+import React from "react";
 import { downloadFile } from "../../constant";
 import { filesize } from "filesize";
 
 function DocumentTable(props) {
-  const { data, user, mod, message, checkedDoc, navigateToDetailPage } = props;
-  console.log("data: ", data);
+  const { data, user, mod, message, deleteList = [], checkedDoc, navigateToDetailPage } = props;
+  const isChecked = (doc) => deleteList.some((item) => item.file === doc.file);
+
   return (
     <div className="pt-3">
       <div className="table-title">
@@ -20,27 +21,28 @@ function DocumentTable(props) {
       </div>
       <div className="document-table">
         {data.length !== 0 &&
-          data.map((item, index) => (
+          data.map((item) => (
             <div
               className="row-custome table-body text-normal pt-25 pb-25 mt-2"
-              key={index}
+              key={item.file}
             >
               <div
                 className="col-11 row-custome"
-                onClick={() => navigateToDetailPage(index)}
+                onClick={() => navigateToDetailPage(item)}
               >
                 <div className="col-4 hidden-long">
                   <input
                     className={mod !== 1 ? "non-active" : ""}
                     type="checkbox"
                     style={{ width: "10%" }}
-                    onChange={(event) => checkedDoc(index, item, event)}
+                    checked={mod === 1 && isChecked(item)}
+                    onChange={(event) => checkedDoc(item, event)}
                   />
                   {item.file}
                 </div>
                 <div className="col-2">{item.modified}</div>
                 <div className="col-2 hidden-long">{item.type}</div>
-                <div className="col-1">{filesize(item.size, { base: 1, standard: "jedec" })}</div>
+                <div className="col-1">{filesize(Number(item.size) || 0, { standard: "jedec" })}</div>
                 <div className="col-3 hidden-long">{item.tag}</div>
               </div>
               <div className="col">

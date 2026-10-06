@@ -1,21 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import "./ProgressBar.css";
 
 export const ProgressBar = (props) => {
-  let { status, percentage, label, additionalInfo, description } = props;
-  useEffect(() => {
-    status = props.status;
-    percentage = props.percentage;
-    label = props.label;
-    additionalInfo = props.additionalInfo;
-    description = props.description;
-    console.log("percentage ", percentage);
-  }, [status]);
+  const { status, percentage, label, additionalInfo, description } = props;
   return (
     <div className="progress-bar-custome">
       <div>{label}</div>
       <small>{description}</small>
-      {status == "in-progress" && (
+      {status === "in-progress" && (
         <div className="progress-bar-layer">
           <div
             className="progress-bar-fill"
@@ -23,7 +15,7 @@ export const ProgressBar = (props) => {
           ></div>
         </div>
       )}
-      {status == "success" && (
+      {status === "success" && (
         <div>
           <i className="fa-regular fa-circle-check text-green"></i>
         </div>
