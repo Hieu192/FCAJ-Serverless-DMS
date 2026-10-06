@@ -11,6 +11,8 @@ export const checkValidPwd = (pwd) => {
   const uppercaseRegExp = /(?=.*?[A-Z])/;
   const lowercaseRegExp = /(?=.*?[a-z])/;
   const digitsRegExp = /(?=.*?[0-9])/;
+  // Same special characters as the default Amazon Cognito password policy
+  const symbolRegExp = /[\^$*.[\]{}()?"!@#%&/\\,><':;|_~`=+\- ]/;
   const minLengthRegExp = /.{8,}/;
 
   if (!uppercaseRegExp.test(pwd)) {
@@ -19,6 +21,8 @@ export const checkValidPwd = (pwd) => {
     warningCheck = "At least one Lowercase";
   } else if (!digitsRegExp.test(pwd)) {
     warningCheck = "At least one digit";
+  } else if (!symbolRegExp.test(pwd)) {
+    warningCheck = "At least one special character";
   } else if (!minLengthRegExp.test(pwd)) {
     warningCheck = "At least minimum 8 characters";
   }
