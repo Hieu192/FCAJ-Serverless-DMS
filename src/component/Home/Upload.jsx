@@ -123,7 +123,7 @@ function Upload(props) {
         }).result;
 
         // Write document information to DynamoDB
-        await api.post("/docs", item.info);
+        // await api.post("/docs", item.info);
 
         totalSizeFile += item.info.size;
         totalUploadedFiles += 1;
