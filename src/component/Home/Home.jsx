@@ -40,7 +40,7 @@ function Home(props) {
         <div className="update-content">
           <div className="infor-item">
             <label className="title text-line">
-              Welcome <strong>{user.username}</strong> to FCJ Document
+              Welcome <strong>{user.username}</strong> to FCAJ Document
               Management System
             </label>
             <br />

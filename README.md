@@ -1,6 +1,6 @@
-# FCJ Document Management System (front-end)
+# FCAJ Document Management System (front-end)
 
-React front-end used by the **FCJ Serverless – Document Management System** workshop series (000133 → 000140).
+React front-end used by the **FCAJ Serverless – Document Management System** workshop series (000133 → 000140).
 
 - Vite + React 18
 - AWS Amplify JS v6 (Amplify Gen 2)

@@ -14,7 +14,7 @@ function Menu(props) {
   return (
     <div className="menu-body pt-2 border-end">
       <span className="title text-center">
-        FCJ Document <br />
+        FCAJ Document <br />
         Management
       </span>
       <div className="menu text-normal" onClick={closeMenu}>

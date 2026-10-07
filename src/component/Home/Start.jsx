@@ -13,7 +13,7 @@ function Start() {
       </div>
       <div style={{marginTop: "15%"}} >
         <span className="text-header">
-          Welcome to <br /> FCJ Document Management System
+          Welcome to <br /> FCAJ Document Management System
         </span>
       </div>
     </div>

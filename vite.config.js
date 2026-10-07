@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Vite configuration for the FCJ Document Management System front-end.
+// Vite configuration for the FCAJ Document Management System front-end.
 // - `npm run dev`   : start the local dev server (http://localhost:3000)
 // - `npm run build` : create the production bundle in the `dist/` folder
 export default defineConfig({
